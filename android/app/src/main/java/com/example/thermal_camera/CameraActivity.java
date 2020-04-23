@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.graphics.Bitmap;
 import android.widget.ImageView;
 import android.util.Log;
+import android.app.Activity;
 
 import io.flutter.embedding.android.FlutterActivity;
 
@@ -24,7 +25,7 @@ import com.flir.thermalsdk.androidsdk.live.connectivity.UsbPermissionHandler;
 import com.flir.thermalsdk.ErrorCode;
 
 
-public class CameraActivity extends FlutterActivity {
+public class CameraActivity extends Activity {
 
     private static final String TAG = "CameraActivity";
 
@@ -44,32 +45,41 @@ public class CameraActivity extends FlutterActivity {
     private DiscoveryEventListener discoveryListener = new DiscoveryEventListener(){
        @Override
         public void onCameraFound(Identity identity) {
-          Log.d(TAG, "Camera found");
+          Log.d(TAG, "Camera found "+ identity.deviceId);
+         
           DiscoveryFactory.getInstance().stop(CommunicationInterface.USB);
-          usbPermissionHandler.requestFlirOnePermisson(identity, getApplicationContext(), permissionListener);
+          if (UsbPermissionHandler.isFlirOne(identity)) {
+            usbPermissionHandler.requestFlirOnePermisson(identity, getApplicationContext(), permissionListener);
+          } else {
+              connect(identity);
+          }
+          
         }
 
         @Override
         public void onDiscoveryError(CommunicationInterface communicationInterface, ErrorCode errorCode) {
           Log.d(TAG, "Discovery Error");
+          DiscoveryFactory.getInstance().stop(CommunicationInterface.USB);
         }
     };
+
+    private void connect(Identity identity) {
+      try {
+            camera.connect(identity, connectionStatusListener);
+            runOnUiThread(() -> {
+                camera.subscribeStream(thermalImageStreamListener);
+              }
+            );
+          } catch (IOException e){
+           Log.d(TAG, "deu ruim!!");
+          }
+    }
 
     private UsbPermissionHandler.UsbPermissionListener permissionListener = new UsbPermissionHandler.UsbPermissionListener() {
         @Override
         public void permissionGranted(Identity identity) {
-
-          try {
-            camera.connect(identity, connectionStatusListener);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                  camera.subscribeStream(thermalImageStreamListener);
-                }
-            });
-          } catch (IOException e){
-
-          }
+          Log.d(TAG, "permissionGranted");
+          connect(identity);
         }
 
         @Override
@@ -87,9 +97,13 @@ public class CameraActivity extends FlutterActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState){
       super.onCreate(savedInstanceState);
+      setContentView(R.layout.activity_main);
+
       ThermalSdkAndroid.init(getApplicationContext());
 
       camera = new Camera();
+
+      setupViews();
 
       DiscoveryFactory.getInstance().scan(discoveryListener, CommunicationInterface.USB);
     };
@@ -97,7 +111,13 @@ public class CameraActivity extends FlutterActivity {
     @Override
     protected void onStop(){
       super.onStop();
-      camera.unsubscribeAllStreams();
+      if (camera == null) {
+            return;
+        }
+        if (camera.isGrabbing()) {
+            camera.unsubscribeAllStreams();
+        }
+        camera.disconnect();
     }
 
     @Override
@@ -108,7 +128,7 @@ public class CameraActivity extends FlutterActivity {
     private final ThermalImageStreamListener thermalImageStreamListener = new ThermalImageStreamListener() {
       @Override
       public void onImageReceived() {
-
+        Log.d(TAG, "IMAGE RECEIVED");
         runOnUiThread(() -> {
           camera.withImage(handleIncomingImage);
         });
@@ -118,6 +138,8 @@ public class CameraActivity extends FlutterActivity {
     private final Camera.Consumer<ThermalImage> handleIncomingImage = new Camera.Consumer<ThermalImage>() {
       @Override
       public void accept(ThermalImage thermalImage) {
+
+          Log.d(TAG, "THERMAL IMAGE RECEIVED");
           //Get a bitmap with only IR data
           Bitmap msxBitmap;
           {
@@ -130,5 +152,9 @@ public class CameraActivity extends FlutterActivity {
             }
           );
       }
+    };
+
+    private void setupViews() {
+        msxImage = findViewById(R.id.msx_image);
     };
 }

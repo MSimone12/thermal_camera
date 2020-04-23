@@ -15,22 +15,20 @@ public class MainActivity extends FlutterActivity {
   
   private static final String CHANNEL = "flirCamera";
 
-  private void startFlirOneActivity(MethodChannel.Result result) {
+  private void startFlirOneActivity(Bundle bundle) {
     Intent intent = new Intent(this, CameraActivity.class);
-    startActivityForResult(intent, 300);
+    startActivity(intent, bundle);
+  }
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    startFlirOneActivity(savedInstanceState);
   }
 
   @Override
   public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
     GeneratedPluginRegistrant.registerWith(flutterEngine);
-
-    new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL).setMethodCallHandler(
-      new MethodChannel.MethodCallHandler() {
-        @Override
-        public void onMethodCall(MethodCall call, MethodChannel.Result result) {
-          startFlirOneActivity(result);
-        }
-      });
   }
 
    @Override

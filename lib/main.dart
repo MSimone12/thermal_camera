@@ -34,14 +34,6 @@ class MyHome extends StatefulWidget {
 
 class _MyHomeState extends State<MyHome> {
 
-  static const platform = MethodChannel('flirCamera');
-
-  @override
-  void initState(){
-    super.initState();
-    platform.invokeMethod('');
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

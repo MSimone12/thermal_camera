@@ -7,6 +7,7 @@
          FlutterApplication and put your custom class here. -->
 
     <uses-feature android:name="android.hardware.usb.host" />
+    <uses-feature android:name="android.hardware.usb.accessory" />
     <application
         android:name="io.flutter.app.FlutterApplication"
         android:label="thermal_camera"
@@ -30,7 +31,10 @@
             android:value="2" />
         <activity
             android:name=".CameraActivity"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+            android:theme="@android:style/Theme.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

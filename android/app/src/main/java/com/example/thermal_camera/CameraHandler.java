@@ -57,7 +57,6 @@ public class CameraHandler {
     private StreamDataListener streamDataListener;
 
     public interface StreamDataListener {
-        public void image(FrameDataHolder dataHolder);
         public void image(Bitmap msxbitmap);
     }
 
@@ -80,7 +79,7 @@ public class CameraHandler {
      * Start discovery of USB and Emulators
      */
     public void startDiscovery(DiscoveryEventListener cameraDiscoveryListener, DiscoveryStatus discoveryStatus) {
-        DiscoveryFactory.getInstance().scan(cameraDiscoveryListener, CommunicationInterface.USB);
+        DiscoveryFactory.getInstance().scan(cameraDiscoveryListener, CommunicationInterface.EMULATOR);
         discoveryStatus.started();
     }
 
@@ -88,7 +87,7 @@ public class CameraHandler {
      * Stop discovery of USB and Emulators
      */
     public void stopDiscovery(DiscoveryStatus discoveryStatus) {
-        DiscoveryFactory.getInstance().stop(CommunicationInterface.USB);
+        DiscoveryFactory.getInstance().stop(CommunicationInterface.EMULATOR);
         discoveryStatus.stopped();
     }
 
@@ -208,7 +207,11 @@ public class CameraHandler {
         public void accept(ThermalImage thermalImage) {
             //Will be called on a non-ui thread,
             // extract information on the background thread and send the specific information to the UI thread
-            Bitmap msxBitmap = BitmapAndroid.createBitmap(thermalImage.getFusion().getPhoto()).getBitMap();
+            Bitmap msxBitmap;
+            {
+                thermalImage.getFusion().setFusionMode(FusionMode.THERMAL_ONLY);
+                msxBitmap = BitmapAndroid.createBitmap(thermalImage.getImage()).getBitMap();
+            }
             Log.d("Consumer", "thermalImage created");
             streamDataListener.image(msxBitmap);
         }

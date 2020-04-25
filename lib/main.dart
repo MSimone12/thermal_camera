@@ -15,7 +15,8 @@ class MyApp extends StatelessWidget {
       title: 'Flutter Demo',
       debugShowCheckedModeBanner: false,
       darkTheme: ThemeData.dark(),
-      themeMode: ThemeMode.dark,
+      theme: ThemeData.light(),
+      themeMode: ThemeMode.light,
       home: MyHome(),
     );
   }
@@ -31,6 +32,8 @@ class _MyHomeState extends State<MyHome> {
 
   String _discovered = 'None Found';
 
+  bool _hasCamera = false;
+
   Uint8List _bitmap;
 
   bool _connected = false;
@@ -40,7 +43,6 @@ class _MyHomeState extends State<MyHome> {
   @override
   void initState() {
     super.initState();
-    _startDiscover();
 
     platform.setMethodCallHandler((MethodCall call) async {
       switch (call.method) {
@@ -49,6 +51,19 @@ class _MyHomeState extends State<MyHome> {
             _bitmap = call.arguments;
           });
           break;
+        case 'discovered':
+          if (call.arguments.length > 0) {
+            setState(() {
+              _discovered = 'Camera Found';
+              _hasCamera = true;
+            });
+          }
+          break;
+          case 'connected':
+            setState(() {
+              _connected = call.arguments;
+            });
+            break;
         default:
       }
     });
@@ -73,8 +88,13 @@ class _MyHomeState extends State<MyHome> {
               '$_discovered',
               style: TextStyle(fontSize: 35),
             ),
+            !_hasCamera ? FlatButton(
+                onPressed: () {
+                  _startDiscover();
+                },
+                child: Text('Start discover')) : Container(),
             Column(
-              children: _cams.length > 0
+              children: _hasCamera && !_connected
                   ? [
                       Text(
                         'Connect',
@@ -98,15 +118,39 @@ class _MyHomeState extends State<MyHome> {
                             child: Text('iniciar'),
                             onPressed: () {
                               platform.invokeMethod('startStream');
-                              Navigator.of(context).push(
-                                  PageRouteBuilder(pageBuilder: (ctx, _, __) {
-                                return FadeTransition(
-                                  opacity: _,
-                                  child: CameraModal(data: _bitmap),
-                                );
-                              })).whenComplete(() async {
-                                _disconnect();
-                              });
+                              // Navigator.of(context).push(
+                              //     PageRouteBuilder(pageBuilder: (ctx, _, __) {
+                              //   return FadeTransition(
+                              //     opacity: _,
+                              //     child: SafeArea(
+                              //       child: Scaffold(
+                              //         body: Stack(
+                              //           fit: StackFit.expand,
+                              //           children: <Widget>[
+                              //             Align(
+                              //               alignment: Alignment.topLeft,
+                              //               child: IconButton(
+                              //                   icon: Icon(Icons.close),
+                              //                   onPressed: () {
+                              //                     Navigator.of(context).pop();
+                              //                     _disconnect();
+                              //                   }),
+                              //             ),
+                              //             Container(
+                              //               constraints:
+                              //                   BoxConstraints.expand(),
+                              //               child: _bitmap != null
+                              //                   ? Image.memory(_bitmap, fit: BoxFit.contain,)
+                              //                   : Container(),
+                              //             )
+                              //           ],
+                              //         ),
+                              //       ),
+                              //     ),
+                              //   );
+                              // })).whenComplete(() async {
+                              //   _disconnect();
+                              // });
                             }),
                       ),
                       Padding(
@@ -120,6 +164,8 @@ class _MyHomeState extends State<MyHome> {
                     ],
                   )
                 : Container(),
+
+                _bitmap != null ? Image.memory(_bitmap, width: 100, height: 200, fit: BoxFit.contain,): Container(),
           ],
         ),
       )),
@@ -127,19 +173,11 @@ class _MyHomeState extends State<MyHome> {
   }
 
   Future<void> _startDiscover() async {
-    List<dynamic> discovered = await platform.invokeListMethod('discover');
-    if (discovered.length > 0) {
-      setState(() {
-        _discovered = 'FLIR ONE found!';
-      });
-    }
+    await platform.invokeListMethod('discover');
   }
 
   Future<void> _connect() async {
-    bool connected = await platform.invokeMethod('connect');
-    setState(() {
-      _connected = connected;
-    });
+    await platform.invokeMethod('connect');
   }
 
   Future<void> _disconnect() async {
@@ -147,5 +185,11 @@ class _MyHomeState extends State<MyHome> {
     setState(() {
       _connected = !disconnected;
     });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _disconnect();
   }
 }

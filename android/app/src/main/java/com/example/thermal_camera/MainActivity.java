@@ -46,8 +46,6 @@ public class MainActivity extends FlutterActivity {
 
   private ArrayList discoveryList = new ArrayList<String>();
 
-  private MethodChannel.Result methodResult;
-
 
   @Override
   public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
@@ -63,31 +61,35 @@ public class MainActivity extends FlutterActivity {
     cameraHandler = new CameraHandler();
 
     channel = new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL);
-    startDiscovery();
+    
 
     setListeners();
   }
 
   private void setListeners() {
     channel.setMethodCallHandler((call, result) -> {
-      methodResult = result;
       if(call.method.equals("connect")){
-        connect(cameraHandler.getFlirOne());
-        result.success(true);
+        connect(cameraHandler.getCppEmulator());
       }
       if(call.method.equals("disconnect")){
         cameraHandler.disconnect();
         result.success(true);
       }
       if(call.method.equals("discover")) {
-        result.success(discoveryList);
+        startDiscovery();
       }
       if(call.method.equals("startStream")){
-        try {
-          cameraHandler.startStream(streamDataListener);
-        } catch (Exception e) {
-          Log.d("Fatal porra", "deu ruim na tentaiva de stream: " + e);
-        }
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+              // Call the desired channel message here.
+              try {
+                cameraHandler.startStream(streamDataListener);
+              } catch (Exception e) {
+                Log.d("Fatal porra", "deu ruim na tentaiva de stream: " + e);
+              }
+            }
+          });
       }
     });
   }
@@ -113,17 +115,34 @@ public class MainActivity extends FlutterActivity {
   }
 
   private void doConnect(Identity identity) {
-    Log.d("Connect", "Trying to connect to: " + identity.deviceId);
-    try {
-      cameraHandler.connect(identity, connectionStatusListener);
+    new Thread(new Runnable(){
+      @Override
+      public void run(){
+        Log.d("Connect", "Trying to connect to: " + identity.deviceId);
+        try {
+          cameraHandler.connect(identity, connectionStatusListener);
 
-       Log.d("Connect", "Connected to: " + identity.deviceId);
-        
-      // cameraHandler.startStream(streamDataListener);
-            
-    } catch (IOException e) {
-      Log.d("Fatal porra", "deu ruim na tentaiva de conexão");
-    }
+          Log.d("Connect", "Connected to: " + identity.deviceId);
+
+          new Handler(Looper.getMainLooper()).post(new Runnable(){
+            @Override
+            public void run(){
+              channel.invokeMethod("connected", true);
+            }
+          });
+                
+        } catch (IOException e) {
+
+          new Handler(Looper.getMainLooper()).post(new Runnable(){
+            @Override
+            public void run(){
+              channel.invokeMethod("connected", false);
+            }
+          });
+          Log.d("Fatal porra", "deu ruim na tentaiva de conexão");
+        }
+      }
+    }).start();
   }
 
   private UsbPermissionHandler.UsbPermissionListener permissionListener = new UsbPermissionHandler.UsbPermissionListener() {
@@ -144,18 +163,13 @@ public class MainActivity extends FlutterActivity {
 
   private final CameraHandler.StreamDataListener streamDataListener = new CameraHandler.StreamDataListener() {
     @Override
-    public void image(FrameDataHolder dataHolder) {
-      Log.d("DataHolder", "dataHolder received");
-    }
-
-    @Override
     public void image(Bitmap msxBitmap) {
       Log.d("StreamListener", "Bitmap received");
       try {
           ByteArrayOutputStream stream = new ByteArrayOutputStream();
           msxBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
           byte[] biteArray = stream.toByteArray();
-
+          msxBitmap.recycle();
           
           new Handler(Looper.getMainLooper()).post(new Runnable() {
             @Override
@@ -176,6 +190,14 @@ public class MainActivity extends FlutterActivity {
         public void onCameraFound(Identity identity) {
           discoveryList.add(identity.deviceId);
           cameraHandler.add(identity);
+
+           new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+              // Call the desired channel message here.
+              channel.invokeMethod("discovered", discoveryList);
+            }
+          });
         }
 
         @Override

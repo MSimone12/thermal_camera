@@ -10,6 +10,8 @@
 package com.example.thermal_camera;
 
 import android.graphics.Bitmap;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.flir.thermalsdk.androidsdk.image.BitmapAndroid;
@@ -17,6 +19,13 @@ import com.flir.thermalsdk.image.ThermalImage;
 import com.flir.thermalsdk.image.fusion.FusionMode;
 import com.flir.thermalsdk.live.Camera;
 import com.flir.thermalsdk.live.CommunicationInterface;
+import com.flir.thermalsdk.image.TemperatureUnit;
+import com.flir.thermalsdk.image.Point;
+import com.flir.thermalsdk.image.JavaImageBuffer;
+import com.flir.thermalsdk.image.palettes.PaletteManager;
+import com.flir.thermalsdk.image.palettes.Palette;
+import com.flir.thermalsdk.image.DistanceUnit;
+import com.flir.thermalsdk.image.measurements.MeasurementSpot;
 import com.flir.thermalsdk.live.Identity;
 import com.flir.thermalsdk.live.connectivity.ConnectionStatusListener;
 import com.flir.thermalsdk.live.discovery.DiscoveryEventListener;
@@ -57,7 +66,9 @@ public class CameraHandler {
     private StreamDataListener streamDataListener;
 
     public interface StreamDataListener {
-        public void image(Bitmap msxbitmap);
+        public void temperature(Double temperature);
+        public void bytes(Bitmap msxBitmap);
+        public void onStreamStopped();
     }
 
     //Discovered FLIR cameras
@@ -73,6 +84,7 @@ public class CameraHandler {
     }
 
     public CameraHandler() {
+        camera = new Camera();
     }
 
     /**
@@ -92,7 +104,6 @@ public class CameraHandler {
     }
 
     public void connect(Identity identity, ConnectionStatusListener connectionStatusListener) throws IOException {
-        camera = new Camera();
         camera.connect(identity, connectionStatusListener);
     }
 
@@ -101,7 +112,7 @@ public class CameraHandler {
             return;
         }
         if (camera.isGrabbing()) {
-            camera.unsubscribeAllStreams();
+            stopStream();
         }
         camera.disconnect();
     }
@@ -117,8 +128,9 @@ public class CameraHandler {
     /**
      * Stop a stream of {@link ThermalImage}s images from a FLIR ONE or emulator
      */
-    public void stopStream(ThermalImageStreamListener listener) {
-        camera.unsubscribeStream(listener);
+    public void stopStream() {
+        camera.unsubscribeAllStreams();
+        streamDataListener.onStreamStopped();
     }
 
     /**
@@ -137,6 +149,10 @@ public class CameraHandler {
      */
     public List<Identity> getCameraList() {
         return Collections.unmodifiableList(foundCameraIdentities);
+    }
+
+    public boolean isConnected() {
+        return camera.isConnected();
     }
 
     /**
@@ -188,16 +204,24 @@ public class CameraHandler {
         @Override
         public void onImageReceived() {
             Log.d("Themal", "image received");
+
+
             //Will be called on a non-ui thread
-            try {
+            new Handler(Looper.getMainLooper()).post(() -> {
+                try {
 
-                camera.withImage(handleIncomingImage);
-            } catch (Exception e) {
+                    camera.withImage(handleIncomingImage);
+                } catch (Exception e) {
 
-                Log.d("Thermal", "Error: thermal image error: " + e);
-            }
+                    Log.d("Thermal", "Error: thermal image error: " + e);
+                }
+            });
         }
     };
+
+    public void close() throws Exception {
+        camera.close();
+    }
 
     /**
      * Function to process a Thermal Image and update UI
@@ -208,12 +232,25 @@ public class CameraHandler {
             //Will be called on a non-ui thread,
             // extract information on the background thread and send the specific information to the UI thread
             Bitmap msxBitmap;
-            {
+            {   
+                final List<Palette> palettes = PaletteManager.getDefaultPalettes();
+                thermalImage.setPalette(palettes.get(0));
                 thermalImage.getFusion().setFusionMode(FusionMode.THERMAL_ONLY);
                 msxBitmap = BitmapAndroid.createBitmap(thermalImage.getImage()).getBitMap();
             }
-            Log.d("Consumer", "thermalImage created");
-            streamDataListener.image(msxBitmap);
+
+
+
+            Double temperature;
+            {
+                int x = msxBitmap.getWidth() / 2;
+                int y = msxBitmap.getWidth() / 2;
+                thermalImage.setTemperatureUnit(TemperatureUnit.CELSIUS);
+                temperature =  thermalImage.getValueAt(new Point(x, y));
+            }
+
+            streamDataListener.bytes(msxBitmap);
+            streamDataListener.temperature(temperature);
         }
     };
 

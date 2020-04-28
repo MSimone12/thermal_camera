@@ -18,6 +18,7 @@ import com.flir.thermalsdk.live.Identity;
 import com.flir.thermalsdk.live.connectivity.ConnectionStatusListener;
 import com.flir.thermalsdk.live.discovery.DiscoveryEventListener;
 import com.flir.thermalsdk.log.ThermalLog;
+import com.flir.thermalsdk.image.JavaImageBuffer;
 
 import android.os.Bundle;
 import android.os.Handler;
@@ -27,6 +28,7 @@ import java.io.IOException;
 import java.io.ByteArrayOutputStream;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.ArrayList;
+import android.util.Base64;
 import java.util.List;
 import java.lang.Exception;
 
@@ -44,19 +46,12 @@ public class MainActivity extends FlutterActivity {
 
   private MethodChannel channel;
 
-  private ArrayList discoveryList = new ArrayList<String>();
-
 
   @Override
   public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
     GeneratedPluginRegistrant.registerWith(flutterEngine);
 
-    ThermalLog.LogLevel enableLoggingInDebug = ThermalLog.LogLevel.NONE;
-
-    //ThermalSdkAndroid has to be initiated from a Activity with the Application Context to prevent leaking Context,
-    // and before ANY using any ThermalSdkAndroid functions
-    //ThermalLog will show log from the Thermal SDK in standards android log framework
-    ThermalSdkAndroid.init(getApplicationContext(), enableLoggingInDebug);
+    ThermalSdkAndroid.init(getApplicationContext());
 
     cameraHandler = new CameraHandler();
 
@@ -68,8 +63,12 @@ public class MainActivity extends FlutterActivity {
 
   private void setListeners() {
     channel.setMethodCallHandler((call, result) -> {
+      if(call.method.equals("cleanAll")){
+        if(cameraHandler.isConnected()) cameraHandler.disconnect();
+        if(!cameraHandler.getCameraList().isEmpty()) cameraHandler.clear();
+      }
       if(call.method.equals("connect")){
-        connect(cameraHandler.getCppEmulator());
+        connect(cameraHandler.getFlirOneEmulator());
       }
       if(call.method.equals("disconnect")){
         cameraHandler.disconnect();
@@ -91,6 +90,19 @@ public class MainActivity extends FlutterActivity {
             }
           });
       }
+      if(call.method.equals("stopStream")){
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+              // Call the desired channel message here.
+              try {
+                cameraHandler.stopStream();
+              } catch (Exception e) {
+                Log.d("Fatal porra", "deu ruim na tentaiva de stream: " + e);
+              }
+            }
+          });
+      }
     });
   }
 
@@ -106,6 +118,21 @@ public class MainActivity extends FlutterActivity {
       //We don't have to stop a discovery but it's nice to do if we have found the camera that we are looking for
       stopDiscovery();
 
+      if(connectedIdentity != null) {
+        new Handler(Looper.getMainLooper()).post(new Runnable(){
+          @Override
+          public void run(){
+            channel.invokeMethod("connected", true);
+          }
+        });
+      }
+
+      if(identity == null){
+        return;
+      }
+
+      connectedIdentity = identity;
+
       if (UsbPermissionHandler.isFlirOne(identity)) {
           usbPermissionHandler.requestFlirOnePermisson(identity, getApplicationContext(), permissionListener);
       } else {
@@ -118,11 +145,8 @@ public class MainActivity extends FlutterActivity {
     new Thread(new Runnable(){
       @Override
       public void run(){
-        Log.d("Connect", "Trying to connect to: " + identity.deviceId);
         try {
           cameraHandler.connect(identity, connectionStatusListener);
-
-          Log.d("Connect", "Connected to: " + identity.deviceId);
 
           new Handler(Looper.getMainLooper()).post(new Runnable(){
             @Override
@@ -139,7 +163,6 @@ public class MainActivity extends FlutterActivity {
               channel.invokeMethod("connected", false);
             }
           });
-          Log.d("Fatal porra", "deu ruim na tentaiva de conexão");
         }
       }
     }).start();
@@ -153,6 +176,8 @@ public class MainActivity extends FlutterActivity {
 
       @Override
       public void permissionDenied(Identity identity) {
+        stopDiscovery();
+        cameraHandler.clear();
       }
 
       @Override
@@ -163,39 +188,54 @@ public class MainActivity extends FlutterActivity {
 
   private final CameraHandler.StreamDataListener streamDataListener = new CameraHandler.StreamDataListener() {
     @Override
-    public void image(Bitmap msxBitmap) {
-      Log.d("StreamListener", "Bitmap received");
+    public void temperature(Double temperature) {
       try {
-          ByteArrayOutputStream stream = new ByteArrayOutputStream();
-          msxBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
-          byte[] biteArray = stream.toByteArray();
-          msxBitmap.recycle();
-          
-          new Handler(Looper.getMainLooper()).post(new Runnable() {
-            @Override
-            public void run() {
-              // Call the desired channel message here.
-              channel.invokeMethod("stream", biteArray);
-            }
-          });
-          
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+          @Override
+          public void run() {
+            channel.invokeMethod("temperature", temperature);
+          }
+        });
+        // msxBitmap.recycle();
       } catch (Exception e) {
-        Log.d("StreamListener", "UNABLE TO PUT IMAGES INTO FRAMES BUFFER "+e);
       }
+    }
+
+    @Override
+    public void bytes(Bitmap msxBitmap){
+      ByteArrayOutputStream stream = new ByteArrayOutputStream();
+      msxBitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+      byte[] byteArray = stream.toByteArray();
+      new Handler(Looper.getMainLooper()).post(new Runnable() {
+        @Override
+        public void run() {
+          channel.invokeMethod("streamBytes", byteArray);
+        }
+      });
+      msxBitmap.recycle();
+    }
+
+    @Override
+    public void onStreamStopped(){
+      new Handler(Looper.getMainLooper()).post(new Runnable() {
+        @Override
+        public void run() {
+          channel.invokeMethod("streamFinished", true);
+        }
+      });
     }
   };
 
   private DiscoveryEventListener discoveryEventListener = new DiscoveryEventListener() {
     @Override
         public void onCameraFound(Identity identity) {
-          discoveryList.add(identity.deviceId);
           cameraHandler.add(identity);
 
            new Handler(Looper.getMainLooper()).post(new Runnable() {
             @Override
             public void run() {
               // Call the desired channel message here.
-              channel.invokeMethod("discovered", discoveryList);
+              channel.invokeMethod("discovered", true);
             }
           });
         }
@@ -217,7 +257,24 @@ public class MainActivity extends FlutterActivity {
   private ConnectionStatusListener connectionStatusListener = new ConnectionStatusListener(){
     @Override
     public void onDisconnected(ErrorCode errorCode){
-      Log.d("Conn", "Desconectou ");
+      new Handler(Looper.getMainLooper()).post(new Runnable(){
+        @Override
+        public void run(){
+          channel.invokeMethod("disconnected", true);
+        }
+      });
     }
   };
+
+  @Override
+  protected void onDestroy(){
+    super.onDestroy(); 
+    cameraHandler.disconnect();
+  }
+
+  @Override
+  protected void onStop(){
+    super.onStop(); 
+    cameraHandler.disconnect();
+  }
 }

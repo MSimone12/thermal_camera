@@ -91,7 +91,7 @@ public class CameraHandler {
      * Start discovery of USB and Emulators
      */
     public void startDiscovery(DiscoveryEventListener cameraDiscoveryListener, DiscoveryStatus discoveryStatus) {
-        DiscoveryFactory.getInstance().scan(cameraDiscoveryListener, CommunicationInterface.EMULATOR);
+        DiscoveryFactory.getInstance().scan(cameraDiscoveryListener, CommunicationInterface.USB);
         discoveryStatus.started();
     }
 
@@ -99,7 +99,7 @@ public class CameraHandler {
      * Stop discovery of USB and Emulators
      */
     public void stopDiscovery(DiscoveryStatus discoveryStatus) {
-        DiscoveryFactory.getInstance().stop(CommunicationInterface.EMULATOR);
+        DiscoveryFactory.getInstance().stop(CommunicationInterface.USB);
         discoveryStatus.stopped();
     }
 

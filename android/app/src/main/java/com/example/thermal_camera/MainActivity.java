@@ -68,7 +68,7 @@ public class MainActivity extends FlutterActivity {
         if(!cameraHandler.getCameraList().isEmpty()) cameraHandler.clear();
       }
       if(call.method.equals("connect")){
-        connect(cameraHandler.getFlirOneEmulator());
+        connect(cameraHandler.getFlirOne());
       }
       if(call.method.equals("disconnect")){
         cameraHandler.disconnect();

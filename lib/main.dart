@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Câmera Térmica',
       debugShowCheckedModeBanner: false,
       darkTheme:
           ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black87),
@@ -32,22 +32,19 @@ class MyHome extends StatefulWidget {
 class _MyHomeState extends State<MyHome> {
   static const platform = MethodChannel('flirCamera');
 
-  String _discovered = 'None Found';
+  String _discovered = 'Câmera indisponível';
 
   bool _hasCamera = false;
 
   bool _connected = false;
 
-  Timer timer;
-  int _start = 5;
-
   ui.Image _image;
 
   double _temp;
 
-  bool _alert = false;
-
-  List<String> _status = List<String>();
+  bool _show = false;
+  int _seconds = 0;
+  int _secondsLimit = 2;
 
   @override
   void initState() {
@@ -61,11 +58,12 @@ class _MyHomeState extends State<MyHome> {
           setState(() {
             _temp = call.arguments;
           });
+          setTemp(call.arguments);
           break;
         case 'discovered':
           if (call.arguments) {
             setState(() {
-              _discovered = 'Camera Found';
+              _discovered = 'Câmera disponível';
               _hasCamera = true;
             });
           }
@@ -91,119 +89,88 @@ class _MyHomeState extends State<MyHome> {
 
   @override
   Widget build(BuildContext context) {
-    if (_image != null && _temp != null) setTemp();
-    if (_alert)
-      showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => AlertDialog(
-                title: _determineAlertDialogTitle(_temp),
-                content: _determineAlertDialogText(_temp),
-                actions: <Widget>[
-                  FlatButton(
-                      onPressed: () {
-                        Navigator.of(_).pop();
-                      },
-                      child: Text("Ok"))
-                ],
-              ));
-
     return SafeArea(
         child: Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
-          if (_image != null)
-            CustomPaint(
-              painter: StreamPainter(_image),
-            ),
-          if (_image != null)
-            Align(
-              alignment: Alignment.center,
-              child: SizedBox(
-                height: 100,
-                width: 100,
-                child: CustomPaint(
-                  painter: RectanglePaint(_image),
-                ),
-              ),
-            ),
-          if (_image == null)
-            Align(
-              alignment: Alignment.topCenter,
-              child: Text(
-                '$_discovered',
-                style: TextStyle(fontSize: 35),
-              ),
-            ),
-          if (!_hasCamera)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: CupertinoButton(
-                  onPressed: () {
-                    _startDiscover();
-                  },
-                  child: Text('Start discover')),
-            ),
-          if (_hasCamera && !_connected)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: CupertinoButton(
-                  child: Text('Connect to FLIR ONE'),
-                  onPressed: () {
-                    _connect();
-                  }),
-            ),
-          if (_connected && _image == null)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 50),
-                child: CupertinoButton.filled(
-                    child: Text('Iniciar'),
-                    onPressed: () {
-                      platform.invokeMethod('startStream');
-                    }),
-              ),
-            ),
-          if (_connected && _image == null)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: CupertinoButton(
-                  child: Text('Desconectar'),
-                  onPressed: () {
-                    _disconnect();
-                  }),
-            ),
-          if (_image != null)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: CupertinoButton.filled(
-                    child: Text("Parar"),
-                    onPressed: () {
-                      _stopStream();
-                    }),
-              ),
-            ),
-          if (_image != null)
-            Align(
-              alignment: Alignment.topCenter,
-              child: Text(
-                "$_start",
-                style: TextStyle(fontSize: 20),
-              ),
-            ),
-          if (_image != null && _temp != null)
-            Align(
-              alignment: Alignment.center,
-              child: Text("$_temp"),
-            )
+          ...discovery(),
+          ...connect(),
+          if (_image != null) ...stream()
         ],
       ),
     ));
   }
+
+  List<Widget> discovery() {
+    return [
+      if (_image == null)
+        Align(
+          alignment: Alignment.topCenter,
+          child: Text(
+            '$_discovered',
+            style: TextStyle(fontSize: 35),
+          ),
+        ),
+      if (!_hasCamera)
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: CupertinoButton(
+              onPressed: () {
+                _startDiscover();
+              },
+              child: Text('Procurar câmera')),
+        ),
+      if (_hasCamera && !_connected)
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: CupertinoButton(
+              child: Text('Connectar à câmera'),
+              onPressed: () {
+                _connect();
+              }),
+        ),
+    ];
+  }
+
+  List<Widget> stream() {
+    return [
+      CustomPaint(
+        painter: StreamPainter(_image),
+      ),
+      CustomPaint(
+        painter: RectanglePaint(),
+      ),
+      Align(
+        alignment: Alignment.topCenter,
+        child: Text("$_seconds", style: TextStyle(fontSize: 30),),
+      ),
+    ];
+  }
+
+  List<Widget> connect() => [
+        if (_connected && _image == null)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 50),
+              child: CupertinoButton.filled(
+                  child: Text('Iniciar'),
+                  onPressed: () {
+                    platform.invokeMethod('startStream');
+                  }),
+            ),
+          ),
+        if (_connected && _image == null)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: CupertinoButton(
+                child: Text('Desconectar'),
+                onPressed: () {
+                  _disconnect();
+                }),
+          ),
+      ];
 
   Future<void> _startDiscover() async {
     await platform.invokeListMethod('discover');
@@ -238,65 +205,74 @@ class _MyHomeState extends State<MyHome> {
     platform.invokeMethod("stopStream");
   }
 
-  Map<String, Color> statusColor = Map<String, Color>.from(
-      {'normal': Colors.green, 'high': Colors.yellow, 'fever': Colors.red});
-
-  String _getTemperatureStatus(double temp) {
-    if (temp > 38) return 'fever';
-    if (temp > 37) return 'high';
-    return 'normal';
-  }
-
-  void setTemp() async {
-    await Future.delayed(Duration(seconds: 1));
-    if (_start < 1) {
-      setState(() {
+  Future<void> setTempStats(double temperature) async {
+    return await Future.delayed(Duration(seconds: 1), () {
+      if (temperature < 30) {
         setState(() {
-          _alert = true;
+          _show = false;
+          _seconds = 0;
         });
+        return;
+      }
+      if (_seconds > _secondsLimit - 1) {
+        showDialog(
+            context: context,
+            barrierDismissible: false,
+            useRootNavigator: true,
+            builder: (_) => AlertDialog(
+                  title: _determineAlertDialogTitle(temperature),
+                  content: _determineAlertDialogText(temperature),
+                )).then((_) {
+          setState(() {
+            _seconds = 0;
+            _show = false;
+          });
+        });
+        Future.delayed(Duration(seconds: 2), () => Navigator.pop(context));
+        return;
+      }
+      setState(() {
+        _seconds = _seconds + 1;
+        _show = false;
       });
-    }
-    setState(() {
-      _start = _start - 1;
     });
   }
 
-  Widget _determineAlertDialogText(double temp) {
-    String msg;
-    if (temp > 38) {
-      msg = "Estado febril, procure um médico";
+  Future<void> setTemp(double temp) async {
+    if (_image != null && _temp != null && !_show) {
+      setState(() {
+        _show = true;
+      });
+      await setTempStats(temp);
     }
-    if (temp > 37) {
-      msg = "Temperatura acima do normal";
-    }
-    msg = "Temperatura normal";
+  }
 
-    return Text(msg);
+  Widget _determineAlertDialogText(double temp) {
+    if (temp >= 37.7) return Text("Estado febril, procure um médico");
+
+    if (temp >= 37 && temp <= 37.7) return Text("Temperatura acima do normal");
+
+    return Text("Temperatura normal");
   }
 
   Widget _determineAlertDialogTitle(double temp) {
-    Icon icon;
-    if (temp > 38) {
-      icon = Icon(
+    if (temp >= 38)
+      return Icon(
         Icons.error,
         color: Colors.red,
         size: 40,
       );
-    }
-    if (temp > 37) {
-      icon = Icon(
+    if (temp >= 37 && temp <= 37.7)
+      return Icon(
         Icons.warning,
         color: Colors.yellow,
         size: 40,
       );
-    }
-    icon = Icon(
+    return Icon(
       Icons.check_circle,
       color: Colors.green,
       size: 40,
     );
-
-    return icon;
   }
 }
 
@@ -310,14 +286,14 @@ class StreamPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // canvas.drawRect(Rect.fromLTWH(0, 0, data.width/2, data.height/2), Paint()..color = Colors.white);
     paintImage(
-        canvas: canvas,
-        rect: Rect.fromCenter(
-            center: size.center(Offset.zero),
-            height: size.height,
-            width: size.width),
-        image: data);
+      canvas: canvas,
+      image: data,
+      rect: Rect.fromCenter(
+          center: size.center(Offset.zero),
+          height: size.height,
+          width: size.width),
+    );
   }
 
   @override
@@ -325,19 +301,15 @@ class StreamPainter extends CustomPainter {
 }
 
 class RectanglePaint extends CustomPainter {
-  final ui.Image img;
-
-  RectanglePaint(this.img);
-
   @override
   void paint(Canvas canvas, Size size) {
-    final Offset zero = size.center(Offset.zero);
+    final Offset zero = size.center(Offset(0, -25));
     final Paint paint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
     canvas.drawRect(
-        Rect.fromCenter(center: zero, height: 100, width: 100), paint);
+        Rect.fromCenter(center: zero, height: 50, width: 50), paint);
   }
 
   @override

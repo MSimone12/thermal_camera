@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:async';
@@ -6,7 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/painting.dart';
 
-void main() => SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) => runApp(MyApp()));
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeRight])
+      .then((_) {
+    runApp(MyApp());
+  });
+}
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
@@ -89,9 +97,11 @@ class _MyHomeState extends State<MyHome> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-        child: Scaffold(
-      body: Stack(
+    SystemChrome.setEnabledSystemUIOverlays([]);
+    return Scaffold(
+        body: Container(
+      constraints: BoxConstraints.expand(),
+      child: Stack(
         fit: StackFit.expand,
         children: <Widget>[
           ...discovery(),
@@ -102,73 +112,102 @@ class _MyHomeState extends State<MyHome> {
     ));
   }
 
+  Widget getTransformedWidget(Widget toTransform) => Transform.rotate(
+        angle: pi / 2,
+        child: toTransform,
+      );
+
+  Widget getTranslatedWidget(Widget toTranslate, Offset where) =>
+      Transform.translate(
+        offset: where,
+        child: toTranslate,
+      );
+
   List<Widget> discovery() {
     return [
       if (_image == null)
         Align(
-          alignment: Alignment.topCenter,
-          child: Text(
-            '$_discovered',
-            style: TextStyle(fontSize: 35),
+          alignment: Alignment.centerRight,
+          child: getTranslatedWidget(
+            getTransformedWidget(Text(
+              '$_discovered',
+              style: TextStyle(fontSize: 35),
+            )),
+            Offset(MediaQuery.of(context).size.height / 2 - 55, 0),
           ),
         ),
       if (!_hasCamera)
         Align(
-          alignment: Alignment.bottomCenter,
-          child: CupertinoButton(
-              onPressed: () {
-                _startDiscover();
-              },
-              child: Text('Procurar câmera')),
+          alignment: Alignment.centerLeft,
+          child: getTranslatedWidget(
+              getTransformedWidget(
+                CupertinoButton(
+                    onPressed: () {
+                      _startDiscover();
+                    },
+                    child: Text('Procurar câmera')),
+              ),
+              Offset(-30, 0)),
         ),
       if (_hasCamera && !_connected)
         Align(
-          alignment: Alignment.bottomCenter,
-          child: CupertinoButton(
-              child: Text('Connectar à câmera'),
-              onPressed: () {
-                _connect();
-              }),
+          alignment: Alignment.centerLeft,
+          child: getTranslatedWidget(
+              getTransformedWidget(CupertinoButton(
+                  child: Text('Connectar à câmera'),
+                  onPressed: () {
+                    _connect();
+                  })),
+              Offset(-30, 0)),
         ),
     ];
   }
 
-  List<Widget> stream() {
-    return [
-      CustomPaint(
-        painter: StreamPainter(_image),
-      ),
-      CustomPaint(
-        painter: RectanglePaint(),
-      ),
-      Align(
-        alignment: Alignment.topCenter,
-        child: Text("$_seconds", style: TextStyle(fontSize: 30),),
-      ),
-    ];
-  }
+  List<Widget> stream() => [
+        getTransformedWidget(
+          CustomPaint(
+            painter: StreamPainter(_image),
+          ),
+        ),
+        getTransformedWidget(CustomPaint(
+          painter: RectanglePaint(),
+        )),
+        Align(
+          alignment: Alignment.centerRight,
+          child: getTransformedWidget(
+            Padding(
+              padding: const EdgeInsets.only(top: 25.0),
+              child: Text(
+                "$_seconds",
+                style: TextStyle(fontSize: 30),
+              ),
+            ),
+          ),
+        ),
+      ];
 
   List<Widget> connect() => [
         if (_connected && _image == null)
           Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 50),
-              child: CupertinoButton.filled(
-                  child: Text('Iniciar'),
-                  onPressed: () {
-                    platform.invokeMethod('startStream');
-                  }),
-            ),
+            alignment: Alignment.centerLeft,
+            child: getTranslatedWidget(
+                getTransformedWidget(CupertinoButton.filled(
+                    child: Text('Iniciar'),
+                    onPressed: () {
+                      platform.invokeMethod('startStream');
+                    })),
+                Offset(0, 0)),
           ),
         if (_connected && _image == null)
           Align(
-            alignment: Alignment.bottomCenter,
-            child: CupertinoButton(
-                child: Text('Desconectar'),
-                onPressed: () {
-                  _disconnect();
-                }),
+            alignment: Alignment.centerLeft,
+            child: getTranslatedWidget(
+                getTransformedWidget(CupertinoButton(
+                    child: Text('Desconectar'),
+                    onPressed: () {
+                      _disconnect();
+                    })),
+                Offset(-30, 0)),
           ),
       ];
 
@@ -219,10 +258,10 @@ class _MyHomeState extends State<MyHome> {
             context: context,
             barrierDismissible: false,
             useRootNavigator: true,
-            builder: (_) => AlertDialog(
+            builder: (_) => getTransformedWidget(AlertDialog(
                   title: _determineAlertDialogTitle(temperature),
                   content: _determineAlertDialogText(temperature),
-                )).then((_) {
+                ))).then((_) {
           setState(() {
             _seconds = 0;
             _show = false;
@@ -291,8 +330,8 @@ class StreamPainter extends CustomPainter {
       image: data,
       rect: Rect.fromCenter(
           center: size.center(Offset.zero),
-          height: size.height,
-          width: size.width),
+          height: data.height.toDouble(),
+          width: data.width.toDouble()),
     );
   }
 

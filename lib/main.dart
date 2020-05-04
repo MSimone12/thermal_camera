@@ -54,9 +54,13 @@ class _MyHomeState extends State<MyHome> {
   int _seconds = 0;
   int _secondsLimit = 2;
 
+  ui.Image _frame;
+
   @override
   void initState() {
     super.initState();
+
+    _getFrame();
 
     platform.invokeMethod('cleanAll');
 
@@ -112,6 +116,15 @@ class _MyHomeState extends State<MyHome> {
     ));
   }
 
+  Future<void> _getFrame() async {
+    ByteData byteData = await rootBundle.load('images/frame.png');
+    Uint8List list = byteData.buffer.asUint8List();
+    ui.Image frame = await _getUiImage(list);
+    setState(() {
+      _frame = frame;
+    });
+  }
+
   Widget getTransformedWidget(Widget toTransform) => Transform.rotate(
         angle: pi / 2,
         child: toTransform,
@@ -133,7 +146,7 @@ class _MyHomeState extends State<MyHome> {
               '$_discovered',
               style: TextStyle(fontSize: 35),
             )),
-            Offset(MediaQuery.of(context).size.height / 2 - 55, 0),
+            Offset(MediaQuery.of(context).size.height / 2 - 100, 0),
           ),
         ),
       if (!_hasCamera)
@@ -166,20 +179,17 @@ class _MyHomeState extends State<MyHome> {
   List<Widget> stream() => [
         getTransformedWidget(
           CustomPaint(
-            painter: StreamPainter(_image),
+            painter: StreamPainter(_frame),
           ),
         ),
-        getTransformedWidget(CustomPaint(
-          painter: RectanglePaint(),
-        )),
         Align(
           alignment: Alignment.centerRight,
           child: getTransformedWidget(
             Padding(
               padding: const EdgeInsets.only(top: 25.0),
               child: Text(
-                "$_seconds",
-                style: TextStyle(fontSize: 30),
+                _determineSeconds(_seconds),
+                style: TextStyle(fontSize: 30, color: Colors.black),
               ),
             ),
           ),
@@ -313,6 +323,11 @@ class _MyHomeState extends State<MyHome> {
       size: 40,
     );
   }
+
+  String _determineSeconds(int seconds) {
+    if (seconds > 0) return "Lendo";
+    return "Procurando";
+  }
 }
 
 Future<ui.Image> _getUiImage(Uint8List data) async {
@@ -330,8 +345,8 @@ class StreamPainter extends CustomPainter {
       image: data,
       rect: Rect.fromCenter(
           center: size.center(Offset.zero),
-          height: data.height.toDouble(),
-          width: data.width.toDouble()),
+          height: size.width,
+          width: size.height),
     );
   }
 

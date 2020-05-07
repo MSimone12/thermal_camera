@@ -271,6 +271,7 @@ class _MyHomeState extends State<MyHome> {
             builder: (_) => getTransformedWidget(AlertDialog(
                   title: _determineAlertDialogTitle(temperature),
                   content: _determineAlertDialogText(temperature),
+                  backgroundColor: Colors.white,
                 ))).then((_) {
           setState(() {
             _seconds = 0;
@@ -297,11 +298,12 @@ class _MyHomeState extends State<MyHome> {
   }
 
   Widget _determineAlertDialogText(double temp) {
-    if (temp >= 37.7) return Text("Estado febril, procure um médico");
+    TextStyle defaultStyle = TextStyle(color: Colors.black);
+    if (temp >= 37.7) return Text("Estado febril, procure um médico", style: defaultStyle,);
 
-    if (temp >= 37 && temp <= 37.7) return Text("Temperatura acima do normal");
+    if (temp >= 37 && temp <= 37.7) return Text("Temperatura acima do normal", style: defaultStyle,);
 
-    return Text("Temperatura normal");
+    return Text("Temperatura normal", style: defaultStyle,);
   }
 
   Widget _determineAlertDialogTitle(double temp) {

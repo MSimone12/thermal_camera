@@ -270,7 +270,12 @@ class _MyHomeState extends State<MyHome> {
             useRootNavigator: true,
             builder: (_) => getTransformedWidget(AlertDialog(
                   title: _determineAlertDialogTitle(temperature),
-                  content: _determineAlertDialogText(temperature),
+                  content: Row(
+                    children: <Widget>[
+                      Image.asset('images/thermometer.png', height: 50,),
+                      _determineAlertDialogText(temperature),
+                    ],
+                  ),
                   backgroundColor: Colors.white,
                 ))).then((_) {
           setState(() {

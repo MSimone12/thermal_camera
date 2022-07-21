@@ -8,7 +8,7 @@
 
     <uses-feature android:name="android.hardware.usb.host" />
     <application
-        android:name="io.flutter.app.FlutterApplication"
+        android:name="${applicationName}"
         android:label="Camera termica"
         android:icon="@mipmap/ic_launcher">
         <activity

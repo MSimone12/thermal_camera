@@ -20,7 +20,6 @@ import com.flir.thermalsdk.live.discovery.DiscoveryEventListener;
 import com.flir.thermalsdk.log.ThermalLog;
 import com.flir.thermalsdk.image.JavaImageBuffer;
 
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.graphics.Bitmap;
@@ -56,7 +55,6 @@ public class MainActivity extends FlutterActivity {
     cameraHandler = new CameraHandler();
 
     channel = new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL);
-    
 
     setListeners();
   }

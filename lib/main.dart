@@ -1,11 +1,10 @@
-import 'dart:math';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'dart:async';
+import 'dart:math';
+import 'dart:ui' as ui;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/painting.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,7 +100,7 @@ class _MyHomeState extends State<MyHome> {
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setEnabledSystemUIOverlays([]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     return Scaffold(
         body: Container(
       constraints: BoxConstraints.expand(),
@@ -272,7 +271,10 @@ class _MyHomeState extends State<MyHome> {
                   title: _determineAlertDialogTitle(temperature),
                   content: Row(
                     children: <Widget>[
-                      Image.asset('images/thermometer.png', height: 50,),
+                      Image.asset(
+                        'images/thermometer.png',
+                        height: 50,
+                      ),
                       _determineAlertDialogText(temperature),
                     ],
                   ),
@@ -304,11 +306,22 @@ class _MyHomeState extends State<MyHome> {
 
   Widget _determineAlertDialogText(double temp) {
     TextStyle defaultStyle = TextStyle(color: Colors.black);
-    if (temp >= 37.7) return Text("Estado febril, procure um médico", style: defaultStyle,);
+    if (temp >= 37.7)
+      return Text(
+        "Estado febril, procure um médico",
+        style: defaultStyle,
+      );
 
-    if (temp >= 37 && temp <= 37.7) return Text("Temperatura acima do normal", style: defaultStyle,);
+    if (temp >= 37 && temp <= 37.7)
+      return Text(
+        "Temperatura acima do normal",
+        style: defaultStyle,
+      );
 
-    return Text("Temperatura normal", style: defaultStyle,);
+    return Text(
+      "Temperatura normal",
+      style: defaultStyle,
+    );
   }
 
   Widget _determineAlertDialogTitle(double temp) {
